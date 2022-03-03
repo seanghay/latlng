@@ -12,6 +12,7 @@
     "vite": "^2.8.0"
   },
   "dependencies": {
+    "clipboard-copy": "^4.0.1",
     "normalize.css": "^8.0.1"
   }
 }

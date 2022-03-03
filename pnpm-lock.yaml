@@ -1,11 +1,13 @@
 lockfileVersion: 5.3
 
 specifiers:
+  clipboard-copy: ^4.0.1
   normalize.css: ^8.0.1
   sass: ^1.49.9
   vite: ^2.8.0
 
 dependencies:
+  clipboard-copy: 4.0.1
   normalize.css: 8.0.1
 
 devDependencies:
@@ -48,6 +50,10 @@ packages:
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
+
+  /clipboard-copy/4.0.1:
+    resolution: {integrity: sha512-wOlqdqziE/NNTUJsfSgXmBMIrYmfd5V0HCGsR8uAKHcg+h9NENWINcfRjtWGU77wDHC8B8ijV4hMTGYbrKovng==}
+    dev: false
 
   /esbuild-android-64/0.14.24:
     resolution: {integrity: sha512-mbhO8NepmUZ84cP/axGR8IzH1Trth+uknEJzz36cZl8FfMA3ooaiBsMyzJ35s70QEAreiEt1XzltZ4pcfOsVUA==}

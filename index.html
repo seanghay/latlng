@@ -30,8 +30,13 @@
 <body class="loading">
   <div id="app">
     <h1>My Location</h1>
-    <input id="input-location" readonly type="text" placeholder="Latitude, Longitude">
-    <button id="button-request">Request Current Location</button>
+    
+    <div>
+      <input id="input-location" readonly type="text" placeholder="Latitude, Longitude">
+      <button id="button-copy">Copy</button>
+    </div>
+
+    <button style="margin: 1em 0;" id="button-request">Request Current Location</button>
   </div>
   <script type="module" src="/main.js"></script>
 </body>
