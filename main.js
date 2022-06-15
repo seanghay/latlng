@@ -5,6 +5,8 @@ import copy from "clipboard-copy";
 const buttonRequest = document.getElementById("button-request");
 const inputRequest = document.getElementById("input-location");
 const buttonCopy = document.getElementById("button-copy");
+const jsonEl = document.getElementById('json-output');
+
 
 buttonCopy.addEventListener("click", async () => {
   buttonCopy.disabled = true;
@@ -22,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loading(true);
     navigator.geolocation.getCurrentPosition(
       (e) => {
+        jsonEl.textContent = `accuracy=${e.coords.accuracy}, timestamp=${e.timestamp}`
         const { latitude, longitude } = e.coords;
         inputRequest.value = `${latitude}, ${longitude}`;
         loading(false);
