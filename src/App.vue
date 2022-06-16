@@ -1,17 +1,57 @@
 <script setup lang="ts">
+import { Codemirror } from "vue-codemirror";
+import { json } from "@codemirror/lang-json";
+import { oneDark } from "@codemirror/theme-one-dark";
+
 import { computed } from "@vue/reactivity";
+import { effect } from "vue";
 import { ref } from "vue";
 import Button from "./components/Button.vue";
 import { requestCurrentLocation } from "./location";
+import copy from "clipboard-copy";
 
 //@ts-ignore
 import { OpenLocationCode } from "open-location-code";
 
 const openLocationCode = new OpenLocationCode();
 
+const isCopyToClipboard = ref(false);
+const isJsonViewVisible = ref(true);
 const isLoading = ref(false);
 const results = ref<any[]>([]);
 const hasResult = computed(() => results.value && results.value.length);
+const jsonValue = computed(() =>
+  JSON.stringify(
+    Object.fromEntries(results.value.map((field) => [field.id, field.value])),
+    null,
+    2
+  )
+);
+
+effect(async () => {});
+
+const extensions = [json(), oneDark];
+
+const translations = new Map(
+  Object.entries({
+    building: "Building",
+    road: "Road",
+    hamlet: "Hamlet",
+    village: "Village",
+    town: "Town",
+    state: "State / City",
+    postcode: "Postal code",
+    country: "Country",
+    country_code: "Country code",
+  })
+);
+
+function getOrDefault(key: string, defaultValue: () => any) {
+  if (translations.has(key)) {
+    return translations.get(key);
+  }
+  return defaultValue();
+}
 
 async function reverseGeo({ latitude, longitude }: any) {
   try {
@@ -30,9 +70,9 @@ async function requestLocation() {
   const { latitude, longitude } = coords;
 
   const first = [
-    { id: 'time', label: "Timestamp", value: new Date().toISOString() },
+    { id: "timestamp", label: "Timestamp", value: new Date().toISOString() },
     {
-      id: "latlng",
+      id: "position",
       label: "Latitude & Longitude",
       value: `${latitude}, ${longitude}`,
     },
@@ -49,12 +89,25 @@ async function requestLocation() {
   const data = await reverseGeo({ latitude, longitude });
   const append = Object.entries(data.address).map(([key, value]) => ({
     id: key,
-    label: key,
+    label: getOrDefault(key, () => key),
     value,
   }));
 
   results.value = [...first, ...append];
 }
+
+function toggleJSONViewer() {
+  isJsonViewVisible.value = !isJsonViewVisible.value;
+}
+
+async function copyClipboard() {
+  await copy(jsonValue.value);
+  isCopyToClipboard.value = true;
+  setTimeout(async () => {
+    isCopyToClipboard.value = false;
+  }, 1000)
+}
+
 </script>
 
 <template>
@@ -88,12 +141,16 @@ async function requestLocation() {
     </div>
 
     <div class="mt-4">
-      <div class="transition bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
-      v-for="(item, index) in results" :key="item.id"
-      :class='[
-        index === 0 ? "border-t border-t-dark-200 rounded-tl-lg rounded-tr-lg" : null,
-        index === results.length - 1 ? "rounded-br-lg rounded-bl-lg" : "" 
-      ]'
+      <div
+        class="transition bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
+        v-for="(item, index) in results"
+        :key="item.id"
+        :class="[
+          index === 0
+            ? 'border-t border-t-dark-200 rounded-tl-lg rounded-tr-lg'
+            : null,
+          index === results.length - 1 ? 'rounded-br-lg rounded-bl-lg' : '',
+        ]"
       >
         <h1 v-if="item.label" class="font-semibold opacity-60 text-sm">
           {{ item.label }}
@@ -102,14 +159,40 @@ async function requestLocation() {
       </div>
     </div>
 
-    <Button v-if="hasResult" class="mt-4 mx-2" small>
-      <div class="text-xl inline-block align-top i-ri-share-box-line"></div>
-      <span class="px-2 inline-block">View JSON</span>
+    <Button v-if="hasResult" @click="toggleJSONViewer" class="mt-4 mr-2" small>
+      <template v-if="!isJsonViewVisible">
+        <div
+          class="text-xl inline-block align-top i-ri-arrow-drop-down-line"
+        ></div>
+        <span class="px-2 inline-block">View JSON</span>
+      </template>
+      <template v-else>
+          <div
+          class="text-xl inline-block align-top i-ri-arrow-drop-up-line"
+        ></div>
+        <span class="px-2 inline-block">Hide JSON</span>
+      </template>
     </Button>
 
-    <Button v-if="hasResult" class="mt-4" small>
-      <div class="text-xl inline-block align-top i-ri-share-box-line"></div>
-      <span class="px-2 inline-block">Share</span>
+    <Button @click="copyClipboard" v-if="hasResult" class="mt-4 mr-2" small>
+  
+
+      <div v-if="isCopyToClipboard" class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"></div>
+      <div v-else class="text-xl inline-block align-top i-ri-file-copy-line"></div>
+      
+      <span v-if="isCopyToClipboard" class="text-light-900 text-opacity-50 px-2 inline-block">Copied</span>
+      <span v-else class="px-2 inline-block">Copy JSON</span>
+    
     </Button>
+
+    <div v-if="isJsonViewVisible && hasResult" class="my-4 overflow-hidden rounded">
+      <codemirror
+        disabled
+        :tab-size="2"
+        :indent-with-tab="true"
+        :model-value="jsonValue"
+        :extensions="extensions"
+      ></codemirror>
+    </div>
   </div>
 </template>

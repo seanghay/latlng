@@ -22,10 +22,16 @@
   },
   "homepage": "https://github.com/seanghay/latlng#readme",
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.0",
+    "@codemirror/theme-one-dark": "^6.0.0",
     "@unocss/reset": "^0.39.0",
+    "clipboard-copy": "^4.0.1",
+    "codemirror": "^6.0.0",
+    "js-base64": "^3.7.2",
     "open-location-code": "^1.0.3",
     "pluscodes": "^2.5.1",
-    "vue": "^3.2.37"
+    "vue": "^3.2.37",
+    "vue-codemirror": "^6.0.0"
   },
   "devDependencies": {
     "@iconify-json/ri": "^1.1.2",
