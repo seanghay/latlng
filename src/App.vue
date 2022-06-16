@@ -12,6 +12,7 @@ import copy from "clipboard-copy";
 
 //@ts-ignore
 import { OpenLocationCode } from "open-location-code";
+import ClipboardButton from "./components/ClipboardButton.vue";
 
 const openLocationCode = new OpenLocationCode();
 
@@ -105,9 +106,8 @@ async function copyClipboard() {
   isCopyToClipboard.value = true;
   setTimeout(async () => {
     isCopyToClipboard.value = false;
-  }, 1000)
+  }, 1000);
 }
-
 </script>
 
 <template>
@@ -142,7 +142,7 @@ async function copyClipboard() {
 
     <div class="mt-4">
       <div
-        class="transition bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
+        class="hoverable-item transition relative bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
         v-for="(item, index) in results"
         :key="item.id"
         :class="[
@@ -156,6 +156,7 @@ async function copyClipboard() {
           {{ item.label }}
         </h1>
         <h1 v-if="item.value" class="text-white">{{ item.value }}</h1>
+        <ClipboardButton :inputValue="item.value"/>
       </div>
     </div>
 
@@ -167,7 +168,7 @@ async function copyClipboard() {
         <span class="px-2 inline-block">View JSON</span>
       </template>
       <template v-else>
-          <div
+        <div
           class="text-xl inline-block align-top i-ri-arrow-drop-up-line"
         ></div>
         <span class="px-2 inline-block">Hide JSON</span>
@@ -175,17 +176,27 @@ async function copyClipboard() {
     </Button>
 
     <Button @click="copyClipboard" v-if="hasResult" class="mt-4 mr-2" small>
-  
+      <div
+        v-if="isCopyToClipboard"
+        class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"
+      ></div>
+      <div
+        v-else
+        class="text-xl inline-block align-top i-ri-file-copy-line"
+      ></div>
 
-      <div v-if="isCopyToClipboard" class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"></div>
-      <div v-else class="text-xl inline-block align-top i-ri-file-copy-line"></div>
-      
-      <span v-if="isCopyToClipboard" class="text-light-900 text-opacity-50 px-2 inline-block">Copied</span>
+      <span
+        v-if="isCopyToClipboard"
+        class="text-light-900 text-opacity-50 px-2 inline-block"
+        >Copied</span
+      >
       <span v-else class="px-2 inline-block">Copy JSON</span>
-    
     </Button>
 
-    <div v-if="isJsonViewVisible && hasResult" class="my-4 overflow-hidden rounded">
+    <div
+      v-if="isJsonViewVisible && hasResult"
+      class="my-4 overflow-hidden rounded"
+    >
       <codemirror
         disabled
         :tab-size="2"
