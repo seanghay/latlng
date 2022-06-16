@@ -30,6 +30,7 @@ async function requestLocation() {
   const { latitude, longitude } = coords;
 
   const first = [
+    { id: 'time', label: "Timestamp", value: new Date().toISOString() },
     {
       id: "latlng",
       label: "Latitude & Longitude",
@@ -42,10 +43,7 @@ async function requestLocation() {
     },
   ];
 
-  results.value = [
-    ...first,
-    { id: "loading", label: "Loading…" }
-  ];
+  results.value = [...first, { id: "loading", label: "Loading…" }];
 
   isLoading.value = false;
   const data = await reverseGeo({ latitude, longitude });
@@ -88,12 +86,26 @@ async function requestLocation() {
         >Request</Button
       >
     </div>
-    <div class="p-1">
-      <div v-for="item in results" :key="item.id">
-        <h1 v-if="item.label" class="mt-3 font-semibold opacity-60 text-sm">{{ item.label }}</h1>
+
+    <div class="mt-4">
+      <div class="transition bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
+      v-for="(item, index) in results" :key="item.id"
+      :class='[
+        index === 0 ? "border-t border-t-dark-200 rounded-tl-lg rounded-tr-lg" : null,
+        index === results.length - 1 ? "rounded-br-lg rounded-bl-lg" : "" 
+      ]'
+      >
+        <h1 v-if="item.label" class="font-semibold opacity-60 text-sm">
+          {{ item.label }}
+        </h1>
         <h1 v-if="item.value" class="text-white">{{ item.value }}</h1>
       </div>
     </div>
+
+    <Button v-if="hasResult" class="mt-4 mx-2" small>
+      <div class="text-xl inline-block align-top i-ri-share-box-line"></div>
+      <span class="px-2 inline-block">View JSON</span>
+    </Button>
 
     <Button v-if="hasResult" class="mt-4" small>
       <div class="text-xl inline-block align-top i-ri-share-box-line"></div>
