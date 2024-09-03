@@ -15,9 +15,10 @@ import { formatDistance, parseISO } from "date-fns";
 import { OpenLocationCode } from "open-location-code";
 import ClipboardButton from "./components/ClipboardButton.vue";
 
-import { GoogleMap, Marker } from "vue3-google-map";
+import "leaflet/dist/leaflet.css";
+import { LMap, LMarker, LTileLayer } from "@vue-leaflet/vue-leaflet";
 
-const center = ref({ lat: 11.556458858733588, lng: 104.92814556872936 });
+const mapMarker = ref([11.556458858733588, 104.92814556872936]); // Phnom Penh - Independence Monument
 const latInput = ref<any>();
 const lngInput = ref<any>();
 const isOpenMap = ref(false);
@@ -196,7 +197,6 @@ function clearAll() {
 }
 
 function handlePaste(event: any) {
-  console.log(typeof event, "Parst");
   const clipboardData = event.clipboardData;
   const pastedData = clipboardData.getData("Text");
 
@@ -206,32 +206,24 @@ function handlePaste(event: any) {
     latInput.value = values[0].trim();
     lngInput.value = values[1].trim();
 
-    center.value = {
-      lat: +latInput.value,
-      lng: +lngInput.value,
-    };
+    mapMarker.value = [+latInput.value, +lngInput.value];
 
     event.preventDefault();
   }
 }
 
 function onMapSubmit() {
-  console.log(center.value);
-  latInput.value = center.value.lat;
-  lngInput.value = center.value.lng;
+  latInput.value = mapMarker.value[0];
+  lngInput.value = mapMarker.value[1];
 
   requestLocation(true);
 }
 
-function handleMapClick(event: any) {
-  console.log(typeof event, "Map");
-  const lat = event.latLng.lat();
-  const lng = event.latLng.lng();
+function onMapClick(event: any) {
+  const lat = event.latlng.lat;
+  const lng = event.latlng.lng;
 
-  center.value = {
-    lat: lat,
-    lng: lng,
-  };
+  mapMarker.value = [lat, lng];
 
   latInput.value = lat;
   lngInput.value = lng;
@@ -239,88 +231,70 @@ function handleMapClick(event: any) {
 </script>
 
 <template>
-  <div class="max-w-720px mx-auto p-4 pb-0 h-screen flex flex-col">
-    <div class="flex justify-center items-center text-light-700 my-2">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        xmlns:xlink="http://www.w3.org/1999/xlink"
-        aria-hidden="true"
-        role="img"
-        class="iconify iconify--bxs"
-        width="64"
-        height="64"
-        preserveAspectRatio="xMidYMid meet"
-        viewBox="0 0 24 24"
-      >
-        <path
-          fill="currentColor"
-          d="M12 2C7.589 2 4 5.589 4 9.995C3.971 16.44 11.696 21.784 12 22c0 0 8.029-5.56 8-12c0-4.411-3.589-8-8-8zm0 12c-2.21 0-4-1.79-4-4s1.79-4 4-4s4 1.79 4 4s-1.79 4-4 4z"
-        ></path>
-      </svg>
-    </div>
-    <h1 class="text-center mt-1 font-bold text-2xl">Location</h1>
-    <p class="opacity-70 text-sm mt-1 text-center">
-      Get detailed information about location.
-    </p>
-
-    <p class="mt-4 text-md opacity-70">Get your current location</p>
-    <div class="mt-2">
-      <Button :loading="isLoading" block @click="() => requestLocation(false)">
-        <div class="text-xl inline-block align-top i-ri-play-circle-line"></div>
-
-        <span class="mx-1">Request</span>
-      </Button>
-    </div>
-
-    <p class="mt-4 text-md opacity-70">Enter Latitude and Longitude</p>
-    <div class="mt-2 flex md:flex-row flex-col gap-3">
-      <input
-        v-model="latInput"
-        type="text"
-        class="rounded-lg text-sm text-white shadow-sm px-3 py-2 grow bg-neutral-800 border border-dark-200 focus:border-dark-200 focus:outline-none focus:border-white-400"
-        placeholder="Latitude"
-        @paste="handlePaste"
-      />
-      <input
-        v-model="lngInput"
-        type="text"
-        class="rounded-lg text-sm text-white shadow-sm px-3 py-2 grow bg-neutral-800 border border-dark-200 focus:border-dark-200 focus:outline-none focus:border-white-400"
-        placeholder="Longitude"
-        @paste="handlePaste"
-      />
-      <Button
-        :loading="isLoading"
-        block
-        @click="() => requestLocation(true)"
-        v-if="!isOpenMap"
-        class="md:!w-fit"
-      >
-        <div class="text-xl inline-block align-top i-ri-play-circle-line"></div>
-        <span class="mx-1">Request</span>
-      </Button>
-    </div>
-
-    <p
-      class="mt-4 text-md opacity-70 cursor-pointer underline"
-      @click="isOpenMap = !isOpenMap"
+  <div class="h-screen flex flex-col">
+    <div
+      class="lg:max-w-720px md:w-4/5 w-full mx-auto p-4 pb-0 flex flex-col relative"
     >
-      {{ isOpenMap ? "Close Map" : "Show Map" }}
-    </p>
-    <transition name="slide-fade">
-      <div v-if="isOpenMap" class="mt-2">
-        <GoogleMap
-          style="width: 100%; height: 30vh"
-          :center="center"
-          :zoom="15"
-          @click="handleMapClick"
+      <div class="flex justify-center items-center text-light-700 my-2">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          aria-hidden="true"
+          role="img"
+          class="iconify iconify--bxs"
+          width="64"
+          height="64"
+          preserveAspectRatio="xMidYMid meet"
+          viewBox="0 0 24 24"
         >
-          <Marker :options="{ position: center }" />
-        </GoogleMap>
+          <path
+            fill="currentColor"
+            d="M12 2C7.589 2 4 5.589 4 9.995C3.971 16.44 11.696 21.784 12 22c0 0 8.029-5.56 8-12c0-4.411-3.589-8-8-8zm0 12c-2.21 0-4-1.79-4-4s1.79-4 4-4s4 1.79 4 4s-1.79 4-4 4z"
+          ></path>
+        </svg>
+      </div>
+      <h1 class="text-center mt-1 font-bold text-2xl">Location</h1>
+      <p class="opacity-70 text-sm mt-1 text-center">
+        Get detailed information about location.
+      </p>
+
+      <p class="mt-4 text-md opacity-70">Get your current location</p>
+      <div class="mt-2">
         <Button
-          class="w-full mt-2"
           :loading="isLoading"
           block
-          @click="onMapSubmit"
+          @click="() => requestLocation(false)"
+        >
+          <div
+            class="text-xl inline-block align-top i-ri-play-circle-line"
+          ></div>
+
+          <span class="mx-1">Request</span>
+        </Button>
+      </div>
+
+      <p class="mt-4 text-md opacity-70">Enter Latitude and Longitude</p>
+      <div class="mt-2 flex md:flex-row flex-col gap-3">
+        <input
+          v-model="latInput"
+          type="text"
+          class="rounded-lg text-sm text-white shadow-sm px-3 py-2 grow bg-neutral-800 border border-dark-200 focus:border-dark-200 focus:outline-none focus:border-white-400"
+          placeholder="Latitude"
+          @paste="handlePaste"
+        />
+        <input
+          v-model="lngInput"
+          type="text"
+          class="rounded-lg text-sm text-white shadow-sm px-3 py-2 grow bg-neutral-800 border border-dark-200 focus:border-dark-200 focus:outline-none focus:border-white-400"
+          placeholder="Longitude"
+          @paste="handlePaste"
+        />
+        <Button
+          :loading="isLoading"
+          block
+          @click="() => requestLocation(true)"
+          v-if="!isOpenMap"
+          class="md:!w-fit"
         >
           <div
             class="text-xl inline-block align-top i-ri-play-circle-line"
@@ -328,141 +302,175 @@ function handleMapClick(event: any) {
           <span class="mx-1">Request</span>
         </Button>
       </div>
-    </transition>
 
-    <h1 v-if="results.length" class="text-start mt-7 font-bold text-xl">
-      Result
-    </h1>
-    <div class="mt-4">
-      <div
-        class="hoverable-item transition relative bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
-        v-for="(item, index) in results"
-        :key="item.id"
-        :class="[
-          index === 0
-            ? 'border-t border-t-dark-200 rounded-tl-lg rounded-tr-lg'
-            : null,
-          index === results.length - 1 ? 'rounded-br-lg rounded-bl-lg' : '',
-        ]"
+      <p
+        class="mt-4 text-md opacity-70 cursor-pointer underline"
+        @click="isOpenMap = !isOpenMap"
       >
-        <h1 v-if="item.label" class="font-semibold opacity-60 text-sm">
-          {{ item.label }}
-        </h1>
-        <h1 v-if="item.value" class="text-white pr-10">{{ item.value }}</h1>
-        <ClipboardButton v-if="item.value" :inputValue="item.value" />
-      </div>
-    </div>
-    <div>
-      <Button
-        v-if="hasResult"
-        @click="toggleJSONViewer"
-        class="mt-4 mr-2"
-        small
-      >
-        <template v-if="!isJsonViewVisible">
-          <div
-            class="text-xl inline-block align-top i-ri-arrow-down-s-fill"
-          ></div>
-          <span class="px-2 inline-block">View JSON</span>
-        </template>
-        <template v-else>
-          <div
-            class="text-xl inline-block align-top i-ri-arrow-up-s-fill"
-          ></div>
-          <span class="px-2 inline-block">Hide JSON</span>
-        </template>
-      </Button>
-
-      <Button @click="copyClipboard" v-if="hasResult" class="mt-4 mr-2" small>
-        <div
-          v-if="isCopyToClipboard"
-          class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"
-        ></div>
-        <div
-          v-else
-          class="text-xl inline-block align-top i-ri-file-copy-line"
-        ></div>
-
-        <span
-          v-if="isCopyToClipboard"
-          class="text-light-900 text-opacity-50 px-2 inline-block"
-          >Copied</span
-        >
-        <span v-else class="px-2 inline-block">Copy JSON</span>
-      </Button>
-
-      <div
-        v-if="isJsonViewVisible && hasResult"
-        class="my-4 overflow-hidden rounded"
-      >
-        <codemirror
-          disabled
-          :tab-size="2"
-          :indent-with-tab="true"
-          :model-value="jsonValue"
-          :extensions="extensions"
-        ></codemirror>
-      </div>
-    </div>
-
-    <div class="mt-4">
-      <Button small block @click="showHistory()">
-        <div
-          class="text-xl inline-block align-top"
-          :class="[
-            historyVisible ? 'i-ri-arrow-up-s-fill' : 'i-ri-arrow-down-s-fill',
-          ]"
-        ></div>
-        <span v-if="historyVisible" class="mx-1">Hide History</span>
-        <span v-else class="mx-1">Show History</span>
-      </Button>
-    </div>
-
-    <div class="mt-4 pb-10" v-if="historyVisible">
-      <h1 class="text-xl font-bold">
-        <div class="text-2xl inline-block align-middle i-ri-history-fill"></div>
-        <span class="mx-2">History</span>
-      </h1>
-
-      <div class="flex flex-col gap-2 mt-2">
-        <p v-if="histories.length == 0">Empty</p>
-
-        <div
-          @click="selectItem(item)"
-          tabindex="1"
-          class="focus:outline-light-600 active:bg-dark-500 border cursor-pointer rounded bg-dark-400 border-dark-300 px-3 py-2"
-          :class="[
-            activeSelectionId === item.id
-              ? 'border-gray-200 text-black bg-gray-300'
-              : null,
-          ]"
-          v-for="item in histories"
-          :key="item.id"
-        >
-          <h1 class="font-bold m-0 p-0">{{ item.data.position }}</h1>
-          <h4 class="text-xs opacity-80">{{ item.data.display_name }}</h4>
-          <h6
-            class="mt-2 text-white bg-dark-300 px-2 rounded mb-1 py-1 inline-block text-xs font-bold"
+        {{ isOpenMap ? "Close Map" : "Show Map" }}
+      </p>
+      <transition name="slide-fade">
+        <div v-if="isOpenMap" class="mt-2">
+          <div class="h-[40vh] w-full bg-dark-200">
+            <LMap ref="map" :zoom="13" :center="mapMarker" @click="onMapClick">
+              <LTileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              ></LTileLayer>
+              <LMarker :lat-lng="mapMarker"> </LMarker>
+            </LMap>
+          </div>
+          <Button
+            class="w-full mt-2"
+            :loading="isLoading"
+            block
+            @click="onMapSubmit"
           >
-            {{ formatDate(item.createdAt) }}
-          </h6>
+            <div
+              class="text-xl inline-block align-top i-ri-play-circle-line"
+            ></div>
+            <span class="mx-1">Request</span>
+          </Button>
+        </div>
+      </transition>
+
+      <h1 v-if="results.length" class="text-start mt-7 font-bold text-xl">
+        Result
+      </h1>
+      <div class="mt-4">
+        <div
+          class="hoverable-item transition relative bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
+          v-for="(item, index) in results"
+          :key="item.id"
+          :class="[
+            index === 0
+              ? 'border-t border-t-dark-200 rounded-tl-lg rounded-tr-lg'
+              : null,
+            index === results.length - 1 ? 'rounded-br-lg rounded-bl-lg' : '',
+          ]"
+        >
+          <h1 v-if="item.label" class="font-semibold opacity-60 text-sm">
+            {{ item.label }}
+          </h1>
+          <h1 v-if="item.value" class="text-white pr-10">{{ item.value }}</h1>
+          <ClipboardButton v-if="item.value" :inputValue="item.value" />
+        </div>
+      </div>
+      <div>
+        <Button
+          v-if="hasResult"
+          @click="toggleJSONViewer"
+          class="mt-4 mr-2"
+          small
+        >
+          <template v-if="!isJsonViewVisible">
+            <div
+              class="text-xl inline-block align-top i-ri-arrow-down-s-fill"
+            ></div>
+            <span class="px-2 inline-block">View JSON</span>
+          </template>
+          <template v-else>
+            <div
+              class="text-xl inline-block align-top i-ri-arrow-up-s-fill"
+            ></div>
+            <span class="px-2 inline-block">Hide JSON</span>
+          </template>
+        </Button>
+
+        <Button @click="copyClipboard" v-if="hasResult" class="mt-4 mr-2" small>
+          <div
+            v-if="isCopyToClipboard"
+            class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"
+          ></div>
+          <div
+            v-else
+            class="text-xl inline-block align-top i-ri-file-copy-line"
+          ></div>
+
+          <span
+            v-if="isCopyToClipboard"
+            class="text-light-900 text-opacity-50 px-2 inline-block"
+            >Copied</span
+          >
+          <span v-else class="px-2 inline-block">Copy JSON</span>
+        </Button>
+
+        <div
+          v-if="isJsonViewVisible && hasResult"
+          class="my-4 overflow-hidden rounded"
+        >
+          <codemirror
+            disabled
+            :tab-size="2"
+            :indent-with-tab="true"
+            :model-value="jsonValue"
+            :extensions="extensions"
+          ></codemirror>
         </div>
       </div>
 
-      <Button
-        v-if="histories.length"
-        @click="clearAll()"
-        small
-        class="mt-4 mr-2"
-      >
-        <div
-          class="text-xl inline-block align-top i-ri-delete-bin-7-line"
-        ></div>
-        <span class="px-2 inline-block">Clear all</span>
-      </Button>
+      <div class="mt-4">
+        <Button small block @click="showHistory()">
+          <div
+            class="text-xl inline-block align-top"
+            :class="[
+              historyVisible
+                ? 'i-ri-arrow-up-s-fill'
+                : 'i-ri-arrow-down-s-fill',
+            ]"
+          ></div>
+          <span v-if="historyVisible" class="mx-1">Hide History</span>
+          <span v-else class="mx-1">Show History</span>
+        </Button>
+      </div>
+
+      <div class="mt-4 pb-10" v-if="historyVisible">
+        <h1 class="text-xl font-bold">
+          <div
+            class="text-2xl inline-block align-middle i-ri-history-fill"
+          ></div>
+          <span class="mx-2">History</span>
+        </h1>
+
+        <div class="flex flex-col gap-2 mt-2">
+          <p v-if="histories.length == 0">Empty</p>
+
+          <div
+            @click="selectItem(item)"
+            tabindex="1"
+            class="focus:outline-light-600 active:bg-dark-500 border cursor-pointer rounded bg-dark-400 border-dark-300 px-3 py-2"
+            :class="[
+              activeSelectionId === item.id
+                ? 'border-gray-200 text-black bg-gray-300'
+                : null,
+            ]"
+            v-for="item in histories"
+            :key="item.id"
+          >
+            <h1 class="font-bold m-0 p-0">{{ item.data.position }}</h1>
+            <h4 class="text-xs opacity-80">{{ item.data.display_name }}</h4>
+            <h6
+              class="mt-2 text-white bg-dark-300 px-2 rounded mb-1 py-1 inline-block text-xs font-bold"
+            >
+              {{ formatDate(item.createdAt) }}
+            </h6>
+          </div>
+        </div>
+
+        <Button
+          v-if="histories.length"
+          @click="clearAll()"
+          small
+          class="mt-4 mr-2"
+        >
+          <div
+            class="text-xl inline-block align-top i-ri-delete-bin-7-line"
+          ></div>
+          <span class="px-2 inline-block">Clear all</span>
+        </Button>
+      </div>
     </div>
     <footer class="grow flex flex-col justify-end">
-      <div class="flex justify-between bg-gray-800 text-white mt-7 p-3">
+      <div class="flex justify-between bg-gray-800 text-white mt-3 p-3">
         <div>&copy; 2024. All rights reserved.</div>
         <a
           class="text-xl inline-block align-top i-ri-github-fill"
