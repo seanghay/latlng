@@ -15,10 +15,17 @@ import { formatDistance, parseISO } from "date-fns";
 import { OpenLocationCode } from "open-location-code";
 import ClipboardButton from "./components/ClipboardButton.vue";
 
+import { GoogleMap, Marker } from "vue3-google-map";
+
+const center = ref({ lat: 11.556458858733588, lng: 104.92814556872936 });
+const latInput = ref<any>();
+const lngInput = ref<any>();
+const isOpenMap = ref(false);
+
 const openLocationCode = new OpenLocationCode();
 const histories = ref<any[]>([]);
 const historyVisible = ref<boolean>(false);
-const activeSelectionId = ref <string | null>(null);
+const activeSelectionId = ref<string | null>(null);
 
 const isCopyToClipboard = ref(false);
 const isJsonViewVisible = ref(false);
@@ -34,9 +41,8 @@ const jsonValue = computed(() =>
 );
 
 effect(async () => {
-  await invalidateHistories()
+  await invalidateHistories();
 });
-
 
 async function invalidateHistories() {
   const db = await cacheDb();
@@ -96,18 +102,34 @@ async function persist(items: any[]) {
       const id = nanoid();
       const key = `__items__`;
       const db = JSON.parse(localStorage.getItem(key) || `[]`);
-      const newDb = [{ id, items, createdAt: new Date().toISOString() }, ...db].slice(0, 20);
+      const newDb = [
+        { id, items, createdAt: new Date().toISOString() },
+        ...db,
+      ].slice(0, 20);
       localStorage.setItem(key, JSON.stringify(newDb));
       resolve(items);
     });
   });
 }
 
-async function requestLocation() {
+async function requestLocation(custom = false) {
   isLoading.value = true;
   activeSelectionId.value = null;
-  const { coords } = await requestCurrentLocation();
-  const { latitude, longitude } = coords;
+
+  let latitude, longitude;
+
+  if (!custom) {
+    const { coords } = await requestCurrentLocation();
+    latitude = coords.latitude;
+    longitude = coords.longitude;
+  } else {
+    latitude = latInput.value;
+    longitude = lngInput.value;
+    if (!latitude || !longitude) {
+      isLoading.value = false;
+      return;
+    }
+  }
 
   const first = [
     { id: "timestamp", label: "Timestamp", value: new Date().toISOString() },
@@ -140,7 +162,7 @@ async function requestLocation() {
 
   results.value = [...first, ...append];
   await persist(results.value);
-  await invalidateHistories()
+  await invalidateHistories();
 }
 
 function toggleJSONViewer() {
@@ -169,13 +191,55 @@ function selectItem({ items, id }: any) {
 }
 
 function clearAll() {
-  localStorage.removeItem('__items__');
-  histories.value = []
+  localStorage.removeItem("__items__");
+  histories.value = [];
+}
+
+function handlePaste(event: any) {
+  console.log(typeof event, "Parst");
+  const clipboardData = event.clipboardData;
+  const pastedData = clipboardData.getData("Text");
+
+  const values = pastedData.split(",");
+
+  if (values.length === 2) {
+    latInput.value = values[0].trim();
+    lngInput.value = values[1].trim();
+
+    center.value = {
+      lat: +latInput.value,
+      lng: +lngInput.value,
+    };
+
+    event.preventDefault();
+  }
+}
+
+function onMapSubmit() {
+  console.log(center.value);
+  latInput.value = center.value.lat;
+  lngInput.value = center.value.lng;
+
+  requestLocation(true);
+}
+
+function handleMapClick(event: any) {
+  console.log(typeof event, "Map");
+  const lat = event.latLng.lat();
+  const lng = event.latLng.lng();
+
+  center.value = {
+    lat: lat,
+    lng: lng,
+  };
+
+  latInput.value = lat;
+  lngInput.value = lng;
 }
 </script>
 
 <template>
-  <div class="max-w-720px mx-auto p-4">
+  <div class="max-w-720px mx-auto p-4 pb-0 h-screen flex flex-col">
     <div class="flex justify-center items-center text-light-700 my-2">
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -196,16 +260,79 @@ function clearAll() {
     </div>
     <h1 class="text-center mt-1 font-bold text-2xl">Location</h1>
     <p class="opacity-70 text-sm mt-1 text-center">
-      Get detailed information about your current location.
+      Get detailed information about location.
     </p>
-    <div class="mt-4">
-      <Button :loading="isLoading" block @click="requestLocation">
+
+    <p class="mt-4 text-md opacity-70">Get your current location</p>
+    <div class="mt-2">
+      <Button :loading="isLoading" block @click="() => requestLocation(false)">
         <div class="text-xl inline-block align-top i-ri-play-circle-line"></div>
 
         <span class="mx-1">Request</span>
       </Button>
     </div>
 
+    <p class="mt-4 text-md opacity-70">Enter Latitude and Longitude</p>
+    <div class="mt-2 flex md:flex-row flex-col gap-3">
+      <input
+        v-model="latInput"
+        type="text"
+        class="rounded-lg text-sm text-white shadow-sm px-3 py-2 grow bg-neutral-800 border border-dark-200 focus:border-dark-200 focus:outline-none focus:border-white-400"
+        placeholder="Latitude"
+        @paste="handlePaste"
+      />
+      <input
+        v-model="lngInput"
+        type="text"
+        class="rounded-lg text-sm text-white shadow-sm px-3 py-2 grow bg-neutral-800 border border-dark-200 focus:border-dark-200 focus:outline-none focus:border-white-400"
+        placeholder="Longitude"
+        @paste="handlePaste"
+      />
+      <Button
+        :loading="isLoading"
+        block
+        @click="() => requestLocation(true)"
+        v-if="!isOpenMap"
+        class="md:!w-fit"
+      >
+        <div class="text-xl inline-block align-top i-ri-play-circle-line"></div>
+        <span class="mx-1">Request</span>
+      </Button>
+    </div>
+
+    <p
+      class="mt-4 text-md opacity-70 cursor-pointer underline"
+      @click="isOpenMap = !isOpenMap"
+    >
+      {{ isOpenMap ? "Close Map" : "Show Map" }}
+    </p>
+    <transition name="slide-fade">
+      <div v-if="isOpenMap" class="mt-2">
+        <GoogleMap
+          style="width: 100%; height: 30vh"
+          :center="center"
+          :zoom="15"
+          @click="handleMapClick"
+        >
+          <Marker :options="{ position: center }" />
+        </GoogleMap>
+        <Button
+          class="w-full mt-2"
+          :loading="isLoading"
+          block
+          @click="onMapSubmit"
+        >
+          <div
+            class="text-xl inline-block align-top i-ri-play-circle-line"
+          ></div>
+          <span class="mx-1">Request</span>
+        </Button>
+      </div>
+    </transition>
+
+    <h1 v-if="results.length" class="text-start mt-7 font-bold text-xl">
+      Result
+    </h1>
     <div class="mt-4">
       <div
         class="hoverable-item transition relative bg-dark-700 hover:bg-dark-400 border-b border-b-dark-200 border-l border-l-dark-200 border-r border-r-dark-200 px-3 py-2.4"
@@ -225,49 +352,57 @@ function clearAll() {
         <ClipboardButton v-if="item.value" :inputValue="item.value" />
       </div>
     </div>
-
-    <Button v-if="hasResult" @click="toggleJSONViewer" class="mt-4 mr-2" small>
-      <template v-if="!isJsonViewVisible">
-        <div
-          class="text-xl inline-block align-top i-ri-arrow-down-s-fill"
-        ></div>
-        <span class="px-2 inline-block">View JSON</span>
-      </template>
-      <template v-else>
-        <div class="text-xl inline-block align-top i-ri-arrow-up-s-fill"></div>
-        <span class="px-2 inline-block">Hide JSON</span>
-      </template>
-    </Button>
-
-    <Button @click="copyClipboard" v-if="hasResult" class="mt-4 mr-2" small>
-      <div
-        v-if="isCopyToClipboard"
-        class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"
-      ></div>
-      <div
-        v-else
-        class="text-xl inline-block align-top i-ri-file-copy-line"
-      ></div>
-
-      <span
-        v-if="isCopyToClipboard"
-        class="text-light-900 text-opacity-50 px-2 inline-block"
-        >Copied</span
+    <div>
+      <Button
+        v-if="hasResult"
+        @click="toggleJSONViewer"
+        class="mt-4 mr-2"
+        small
       >
-      <span v-else class="px-2 inline-block">Copy JSON</span>
-    </Button>
+        <template v-if="!isJsonViewVisible">
+          <div
+            class="text-xl inline-block align-top i-ri-arrow-down-s-fill"
+          ></div>
+          <span class="px-2 inline-block">View JSON</span>
+        </template>
+        <template v-else>
+          <div
+            class="text-xl inline-block align-top i-ri-arrow-up-s-fill"
+          ></div>
+          <span class="px-2 inline-block">Hide JSON</span>
+        </template>
+      </Button>
 
-    <div
-      v-if="isJsonViewVisible && hasResult"
-      class="my-4 overflow-hidden rounded"
-    >
-      <codemirror
-        disabled
-        :tab-size="2"
-        :indent-with-tab="true"
-        :model-value="jsonValue"
-        :extensions="extensions"
-      ></codemirror>
+      <Button @click="copyClipboard" v-if="hasResult" class="mt-4 mr-2" small>
+        <div
+          v-if="isCopyToClipboard"
+          class="text-light-900 text-opacity-50 text-xl inline-block align-top i-ri-check-double-line"
+        ></div>
+        <div
+          v-else
+          class="text-xl inline-block align-top i-ri-file-copy-line"
+        ></div>
+
+        <span
+          v-if="isCopyToClipboard"
+          class="text-light-900 text-opacity-50 px-2 inline-block"
+          >Copied</span
+        >
+        <span v-else class="px-2 inline-block">Copy JSON</span>
+      </Button>
+
+      <div
+        v-if="isJsonViewVisible && hasResult"
+        class="my-4 overflow-hidden rounded"
+      >
+        <codemirror
+          disabled
+          :tab-size="2"
+          :indent-with-tab="true"
+          :model-value="jsonValue"
+          :extensions="extensions"
+        ></codemirror>
+      </div>
     </div>
 
     <div class="mt-4">
@@ -284,21 +419,23 @@ function clearAll() {
     </div>
 
     <div class="mt-4 pb-10" v-if="historyVisible">
-      <h1 class="text-2xl font-bold">
+      <h1 class="text-xl font-bold">
         <div class="text-2xl inline-block align-middle i-ri-history-fill"></div>
         <span class="mx-2">History</span>
       </h1>
 
       <div class="flex flex-col gap-2 mt-2">
-
         <p v-if="histories.length == 0">Empty</p>
 
         <div
           @click="selectItem(item)"
           tabindex="1"
-        
           class="focus:outline-light-600 active:bg-dark-500 border cursor-pointer rounded bg-dark-400 border-dark-300 px-3 py-2"
-          :class="[activeSelectionId === item.id ? 'border-gray-200 text-black bg-gray-300' : null]"
+          :class="[
+            activeSelectionId === item.id
+              ? 'border-gray-200 text-black bg-gray-300'
+              : null,
+          ]"
           v-for="item in histories"
           :key="item.id"
         >
@@ -312,10 +449,50 @@ function clearAll() {
         </div>
       </div>
 
-      <Button v-if="histories.length" @click="clearAll()" small class="mt-4 mr-2">
-        <div class="text-xl inline-block align-top i-ri-delete-bin-7-line"></div>
-        <span class=" px-2 inline-block">Clear all</span>
+      <Button
+        v-if="histories.length"
+        @click="clearAll()"
+        small
+        class="mt-4 mr-2"
+      >
+        <div
+          class="text-xl inline-block align-top i-ri-delete-bin-7-line"
+        ></div>
+        <span class="px-2 inline-block">Clear all</span>
       </Button>
     </div>
+    <footer class="grow flex flex-col justify-end">
+      <div class="flex justify-between bg-gray-800 text-white mt-7 p-3">
+        <div>&copy; 2024. All rights reserved.</div>
+        <a
+          class="text-xl inline-block align-top i-ri-github-fill"
+          href="https://github.com/seanghay/latlng"
+          target="blank"
+        />
+      </div>
+    </footer>
   </div>
 </template>
+
+<style>
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.slide-fade-enter-to,
+.slide-fade-leave-from {
+  max-height: 500px;
+  opacity: 1;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+</style>

@@ -33,7 +33,8 @@
     "open-location-code": "^1.0.3",
     "pluscodes": "^2.5.1",
     "vue": "^3.2.37",
-    "vue-codemirror": "^6.0.0"
+    "vue-codemirror": "^6.0.0",
+    "vue3-google-map": "^0.21.0"
   },
   "devDependencies": {
     "@iconify-json/ri": "^1.1.2",
